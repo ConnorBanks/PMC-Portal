@@ -1,0 +1,70 @@
+@use '../abstracts' as *;
+//////////////////////////////////////////////////////////////////////
+// Wrapper Template
+//////////////////////////////////////////////////////////////////////
+.wrapper{
+  font-family: "Plus Jakarta Sans", sans-serif;
+  background-color:$offwhite;
+  width:calc(100% - 320px)!important;
+  margin-left:320px!important;
+  min-height:100vh;
+  padding-top:75px;
+  padding-bottom:75px;
+  @include media("<=lg") {
+    width:calc(100%)!important;
+    margin-left:110px!important;
+  }
+  @include media("<=sm") {
+    padding-top:25px;
+    padding-bottom:25px;
+  }
+  *:not(.slick-track){
+    -webkit-transition: all .1s linear;
+    -moz-transition: all .1s linear;
+    -o-transition: all .1s linear;
+    transition: all .1s linear;
+  }
+  main{
+    position: relative;
+    h1.wp-block-heading, h2.wp-block-heading, h3.wp-block-heading, h4.wp-block-heading, h5.wp-block-heading, h6.wp-block-heading{
+      //font-family: Bebas-Neue, sans-serif;
+      width:100%;
+      border-bottom:1px solid $primary;
+    }
+    h1, h2, h3, h4, h5, h6{
+      //font-family: Bebas-Neue, sans-serif;
+    }
+    h1{
+      //font-size:120px;
+    }
+    h2{
+
+    }
+    h3{
+
+    }
+    h4{
+
+    }
+    h5{
+
+    }
+    h6{
+
+    }
+  }
+  &.menu-collapsed{
+    margin-left:0!important;
+    margin-right:auto;
+    width:100%!important;
+    padding-left:100px;
+  }
+}
+
+// html :where(.wp-block){
+//   max-width:80%;
+// }
+
+// .acf-block-preview{
+//   width:100%;
+// }

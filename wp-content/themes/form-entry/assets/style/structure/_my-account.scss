@@ -1,0 +1,232 @@
+@use '../abstracts' as *;
+.page.user-account{
+  .wrapper{
+    display:flex;
+    justify-content: center;
+    align-items: center;
+  }
+}
+.login-container{
+  width:330px;
+  margin:0 auto;
+  height:80vh;
+  display:flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap:10px;
+  > *{
+    width:100%;
+  }
+  h3{
+    font-weight:700;
+  }
+
+  /* Layout */
+#loginform{
+  max-width: 420px;
+  margin: 0 auto 0px;
+  padding: 10px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Spacing */
+#loginform p{ margin: 0 0 18px; }
+
+/* Labels */
+#loginform label{
+  display: block;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 8px;
+}
+
+/* Inputs */
+#loginform .input{
+  width: 100%;
+  border: 1px solid #d7dfe7;
+  border-radius: 12px;
+  padding: 16px 14px;
+  font-size: 16px;
+  outline: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+#loginform .input:focus{
+  border-color: #5b8ef2;
+  box-shadow: 0 0 0 3px rgba(91,142,242,.25);
+}
+
+/* "Remember Me" → switch */
+#loginform .login-remember label{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #6b7280;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Make the checkbox look like a switch (works with your existing markup) */
+#loginform #rememberme{
+  appearance: none;
+  -webkit-appearance: none;
+  width: 54px;
+  height: 30px;
+  border-radius: 999px;
+  background: #102f39;          /* track */
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  flex: 0 0 54px;
+  border: none;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+}
+
+#loginform #rememberme::after{
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  background: #fff;             /* knob */
+  border-radius: 50%;
+  transition: transform .2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+
+#loginform #rememberme:checked::after{
+  transform: translateX(24px);
+}
+
+#loginform #rememberme:focus{
+  box-shadow: 0 0 0 3px rgba(91,142,242,.25);
+}
+
+/* Button – full width, dark teal */
+#loginform .button.button-primary{
+  width: 100%;
+  background: #0f3a47;
+  border: 0;
+  color: #fff;
+  font-weight: 700;
+  padding: 16px 20px;
+  font-size: 18px;
+  border-radius: 10px;
+  height: auto;
+  line-height: 1.2;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+#loginform .button.button-primary:hover{
+  background: #0b2e38;
+}
+
+/* Tidy label for the submit area (no extra spacing) */
+#loginform .login-submit label{ display:none; }
+
+
+  .account-application{
+    text-align: center;
+    font-size:14px;
+    color:#aaa;
+    a{
+      color:$primary;
+      font-weight:700;
+      text-decoration: underline;
+    }
+    
+  }
+ /* --- Remember Me: turn checkbox into a toggle (no HTML edits) --- */
+.login-remember .frm_checkbox label {
+  /* sizing tokens so you can tweak easily */
+  --track-w: 54px;
+  --track-h: 28px;
+  --knob: 24px;
+
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  line-height: var(--track-h);
+  padding-left: calc(var(--track-w) + 12px); /* space for the toggle on the left */
+  user-select: none;
+}
+
+/* Visually hide the native checkbox but keep it clickable via the label */
+.login-remember .frm_checkbox label > input[type="checkbox"] {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--track-w);
+  height: var(--track-h);
+  margin: 0;
+  opacity: 0;                 /* keep it focusable & clickable */
+}
+
+/* Track */
+.login-remember .frm_checkbox label::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--track-w);
+  height: var(--track-h);
+  transform: translateY(-50%);
+  background: #cfcfd3;
+  border-radius: 999px;
+  transition: background-color .25s ease;
+}
+
+/* Knob */
+.login-remember .frm_checkbox label::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: var(--knob);
+  height: var(--knob);
+  transform: translateY(-50%);
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,.35);
+  transition: transform .25s ease;
+}
+
+/* Checked state – use :has() because the input is nested inside the label */
+.login-remember .frm_checkbox label:has(> input[type="checkbox"]:checked)::before {
+  background: #4caf50;
+}
+
+.login-remember .frm_checkbox label:has(> input[type="checkbox"]:checked)::after {
+  transform: translate(calc(var(--track-w) - var(--knob) - 2px), -50%);
+}
+
+/* Keyboard focus ring (when the hidden input is focused) */
+.login-remember .frm_checkbox label:has(> input[type="checkbox"]:focus-visible)::before {
+  outline: 2px solid #222;
+  outline-offset: 2px;
+}
+
+/* --- Graceful fallback if :has() isn't supported (shows normal checkbox) --- */
+@supports not (selector(:has(*))) {
+  .login-remember .frm_checkbox label {
+    padding-left: 0;
+  }
+  .login-remember .frm_checkbox label::before,
+  .login-remember .frm_checkbox label::after {
+    content: none;
+  }
+  .login-remember .frm_checkbox label > input[type="checkbox"] {
+    position: static;
+    opacity: 1;
+    width: auto;
+    height: auto;
+  }
+}
+
+}

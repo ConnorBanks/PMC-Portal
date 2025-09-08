@@ -1,0 +1,103 @@
+//////////////////////////////////////////////////////////////////////
+// Share Buttons
+//////////////////////////////////////////////////////////////////////
+@use '../abstracts' as *;
+.share-buttons-container{
+  display:flex;
+  justify-content: flex-start;
+  align-items: center;
+  position: relative;
+  margin-top:10px;
+  z-index: 999;
+  > p.btn{
+    z-index: 9999;;
+    @include transition(0);
+    &.open{
+      background-color:$secondary;
+      width:250px;
+      border-radius:20px 20px 0 0!important;
+    }
+  }
+  .share-buttons{
+    display:flex;
+    flex-direction: column;
+    display:none;
+    width:100%;
+    position: absolute;
+    z-index: 998;;
+    left:0px;
+    top:60px;
+    @include transition(0.2s);
+    &.open{
+      display:flex;
+      width:250px;
+      background: rgba($primary, 0.70);
+      backdrop-filter: blur(5.5px);
+      -webkit-backdrop-filter: blur(5.5px);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.23);
+      border-top:5px solid $primary;
+      padding:15px 15px;
+      border-radius: 0 0 30px 30px;
+    }
+  }
+  a{
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    height:40px;
+    width:100%;
+    padding-left:10px;
+    margin-bottom:10px;
+    font-size:16px;
+    border-radius:50px;
+    color:white;
+    &:last-child{
+      border:0;
+      margin-bottom:0;
+    }
+    i{
+      font-size:18px;
+      margin-left:8px;
+      margin-right:8px;
+      color:white;
+      *{
+        //fill:$offwhite;
+      }
+    }
+    &.facebook-share{
+      background-color:#3b5998;
+      &:hover{
+        
+      }
+
+    }
+    &.twitter-share{
+      background-color:#000;
+      &:hover{
+        
+      }
+
+    }
+    &.linkedin-share{
+      background-color:#0077B5;
+      &:hover{
+        
+      }
+
+    }
+    &.email-share{
+      background-color:$primary;
+      &:hover{
+        
+      }
+
+    }
+    &:hover{
+      color:white;
+      text-decoration: none;
+      i{
+        margin-right:15px;
+      }
+    }
+  }
+}

@@ -1,0 +1,98 @@
+//////////////////////////////////////////////////////////////////////
+// Buttons
+//////////////////////////////////////////////////////////////////////
+@use '../abstracts' as *;
+@use "sass:color";
+p.btn{
+  background-color:rgba($primary,30%);
+  padding:12px 40px;
+  position: relative;
+  border-radius:25px;
+  margin:0 20px 0 0px;
+  -webkit-transition: all .1s ease;
+  -moz-transition: all .1s ease;
+  -o-transition: all .1s ease;
+  transition: all .1s ease;
+  a{
+    color:$primary;
+    //padding:10px;
+    position: relative;
+    z-index: 10;
+    display:flex;
+    justify-content: center;
+    align-items: center;
+    height:100%;
+    font-size:14px;
+    font-weight:700;
+    i{
+      font-size:14px;
+      margin-left:5px;
+    }
+  }
+  &:hover{
+    background-color:$primary;
+    //border-color:darken($offwhite,10%);
+    a{
+      color:$offwhite;
+      text-decoration: none;
+    }
+  }
+}
+
+p.btn-second{
+  background-color:$primary;
+  border:1px solid $offwhite;
+  a{
+    color:$offwhite;
+  }
+  &:hover{
+    background-color:$offwhite;
+    a{
+      color:$primary;
+    }
+  }
+}
+
+p.btn-ghost{
+  background-color: transparent;
+  border:1px solid $primary;
+  a{
+
+  }
+  &:hover{
+    a{
+      color:$primary;
+    }
+  }
+}
+
+p.btn-white{
+  border-color:$offwhite;
+  a, span{
+    color:$offwhite;
+  }
+  &:hover{
+    a, span{
+      color:$primary;
+    }
+  }
+}
+
+p.btn-red{
+  border-color:$red;
+  background-color:$red;
+  border-radius:0;
+  padding:20px 40px;
+  height:75px!important;
+  a, span, i{
+    color:$offwhite;
+  }
+  i{
+    margin-right:7px;
+  }
+  &:hover{
+    a, span, i{
+      color:$primary;
+    }
+  }
+}

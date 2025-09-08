@@ -1,0 +1,127 @@
+//////////////////////////////////////////////////////////////////////
+// Google Captcha
+//////////////////////////////////////////////////////////////////////
+@use '../abstracts' as *;
+
+.data-table{
+    position: re;
+    @include media("<=md") {
+       width:100%;
+       overflow-x: scroll;
+    }
+    .table-header{
+        font-weight:700;
+        @include media("<=md") {
+            width:1000px;
+        }
+        p{
+            flex-grow: 2;
+            min-width:25%;
+            max-width:30%;
+            opacity: 0.6;
+        }
+       &.list-item{
+        border:0;
+       } 
+    }
+    .list-item{
+        display:flex;
+        justify-content: flex-start;
+        align-items: center;
+        border-bottom:1px solid #eee;
+        @include media("<=md") {
+            width:1000px;
+        }
+        div{
+            margin-bottom:0;
+            padding:12px 0;
+            flex-grow: 2;
+            min-width:25%;
+            max-width:30%;
+            &.edit{
+                text-align: right;
+                opacity: 0.2;;
+                &:hover{
+                    opacity:1;
+                    cursor: pointer;
+                }
+            }
+            a{
+                color:inherit;
+            }
+            &.status.publish{
+                .btn{
+                    background-color:$primary;
+                    color:white;
+                }
+            }
+            &.status.draft{
+                .btn{
+                    background-color:$offwhite;
+                    color:$primary;
+                    border:2px solid $primary;
+                }
+            }
+        }
+        &.report-item{
+            position: relative;
+            &:hover{
+                background-color:#eee;
+            }
+            a{
+                position: absolute;
+                top:0;
+                left:0;
+                width:100%;
+                height:100%;
+                
+            }
+        }
+    }
+}
+
+.facetwp-pager{
+    margin-top:25px;
+    display:flex;
+    align-items: center;
+    gap:6px;
+    a:not(.next,.prev){
+        border:1px solid $primary;
+        border-radius:100%;
+        height:32px;
+        width:32px;
+        font-weight:700;
+        display:flex;
+        justify-content: center;
+        align-items: center;
+        font-weight:500;
+        &.active{
+            background-color:rgba(19, 62, 80, 0.23);
+        }
+    }
+}
+
+.facetwp-facet-search{
+    margin-bottom:0!important;
+    height:48px;
+    input{
+        height:48px;
+        border-radius:8px;
+        border:1px solid rgba($primary,0.3);
+        padding-left:16px;
+        padding-right:8px;
+    }
+}
+
+.facetwp-type-sort{
+    margin-bottom:0!important;
+    select{
+        height:48px;
+        border-radius:8px;
+        border:1px solid rgba($primary,0.3);
+        padding-left:16px;
+        padding-right:8px;
+        min-width:150px;
+    }
+}
+

@@ -1,0 +1,23 @@
+//////////////////////////////////////////////////////////////////////
+// Mobile Menu
+//////////////////////////////////////////////////////////////////////
+@use '../abstracts' as *;
+.off-canvas-menu-trigger{
+  height:50px;
+  width:50px;
+  display:flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  i{
+    color:$offwhite;
+    font-size:24px;
+  }
+  &:hover{
+    cursor: pointer;
+    background-color:#D3B96D;
+  }
+  @include media(">xl") {
+    //display:none;
+  }
+}

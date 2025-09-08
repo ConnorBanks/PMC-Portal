@@ -1,0 +1,24 @@
+@mixin breakout {
+  width: 100vw;
+  position: relative;
+  left: calc(-1 * (100vw - 100%) / 2);
+}
+
+@mixin debug{
+  *{
+    border:1px solid red;
+  }
+}
+
+@mixin shadow{
+  -webkit-box-shadow: 10px 10px 24px -6px rgba(0,0,0,0.52);
+  -moz-box-shadow: 10px 10px 24px -6px rgba(0,0,0,0.52);
+  box-shadow: 10px 10px 24px -6px rgba(0,0,0,0.52);
+}
+
+@mixin transition($speed){
+  -webkit-transition: all $speed ease-in;
+  -moz-transition: all $speed  ease-in;
+  -o-transition: all $speed  ease-in;
+  transition: all $speed ease-in;
+}

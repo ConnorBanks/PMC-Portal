@@ -1,0 +1,21 @@
+//////////////////////////////////////////////////////////////////////
+// 404 Template Page
+//////////////////////////////////////////////////////////////////////
+@use '../abstracts' as *;
+.error404{
+  .page-content{
+    height:500px;
+    display:flex;
+    align-items: flex-start;
+    justify-content: center;
+    flex-direction:column;
+    svg{
+      width:120px;
+      height:auto;
+      margin-bottom:25px;
+    }
+  }
+  .flex-content{
+    border-top:1px solid $secondary;
+  }
+}

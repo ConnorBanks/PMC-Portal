@@ -1,0 +1,59 @@
+@use '../abstracts' as *;
+main{
+  .page-header-block{
+      //@include breakout();
+  }
+}
+
+.page-header-block{
+  margin-bottom:50px;
+  .content{
+    display:flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    @include media("<=sm") {
+      flex-direction: column;
+    }
+    h1{
+      flex-grow: 2;
+      font-size:32px;
+      font-weight:700;
+      @include media("<=sm") {
+        order:2;
+      }
+    }
+    .btn{
+      margin-left: 15px;
+      @include media("<=sm") {
+        order:1;
+        margin-left:0;
+        margin-bottom:25px;
+      }
+    }
+  }
+  .facets-container{
+    display:flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap:10px;
+    @include media("<=sm") {
+      order:3;
+      width:100%;
+      align-items: flex-start;
+      margin-top:25px;
+    }
+    .facet-container{
+      display:flex;
+      align-items: center;
+      span{
+        font-size:14px;
+        margin-right:5px;
+        opacity:0.6;
+      }
+    }
+  }
+}
+
+
+

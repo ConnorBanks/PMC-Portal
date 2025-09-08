@@ -1,0 +1,1 @@
+/Users/connorbanks/Local Sites/form-entry-software/app/public/wp-content/plugins/query-monitor/wp-content/db.php
