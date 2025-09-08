@@ -1,6 +1,6 @@
 <?php
 /**
- * Template Name: Add Report (ACF) – With Email
+ * Template Name: Add Report (ACF) – With Email (PM Recipient)
  */
 defined('ABSPATH') || exit;
 
@@ -20,10 +20,6 @@ $acf_key_site     = ''; // e.g. 'field_def456site'
 $acf_videos         = 'videos';        // repeater field name
 $acf_video_file     = 'video_file';    // file subfield name
 $acf_video_caption  = 'video_caption'; // optional; '' if you don’t have one
-
-/* ---------- Email settings ---------- */
-$notify_to = get_option('admin_email'); // change/add recipients as needed
-$notify_cc = [];                        // e.g. ['ops@example.com','pm@example.com']
 
 /* ---------- Helpers ---------- */
 function _report_safe_redirect(string $url, int $status = 303) {
@@ -91,102 +87,45 @@ function _save_post_link_field(int $post_id, string $field_name, int $incoming_i
   if (!$ok && $key) {
     update_post_meta($post_id, '_' . $field_name, $key);
     update_post_meta($post_id, $field_name, $value_to_save);
-    if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
-      error_log(sprintf('[Add Report] Fallback meta for %s via key %s', $field_name, $key));
-    }
   }
 }
-/** Format a date string/ACF Ymd to a friendly label */
-function _fmt_acf_date_label($raw) {
-  if (!$raw) return '';
-  if (preg_match('/^\d{8}$/', $raw)) $raw = substr($raw,0,4) . '-' . substr($raw,4,2) . '-' . substr($raw,6,2);
-  $ts = strtotime($raw);
-  return $ts ? date_i18n('j M Y', $ts) : $raw;
-}
-/** Send “New Report” email (HTML). Non-blocking: errors are logged, not shown to user. */
-function _send_new_report_email(array $args): void {
-  $defaults = [
-    'new_id'      => 0,
-    'client_id'   => 0,
-    'site_id'     => 0,
-    'date_store'  => '',
-    'po_number'   => '',
-    'notes'       => '',
-    'view_url'    => '',
-    'notify_to'   => '',
-    'notify_cc'   => [],
-  ];
-  $a = array_merge($defaults, $args);
 
-  if (empty($a['notify_to'])) return;
-
-  $client_title = $a['client_id'] ? get_the_title($a['client_id']) : '';
-  $site_title   = $a['site_id']   ? get_the_title($a['site_id'])   : '';
-  $date_label   = _fmt_acf_date_label($a['date_store']);
-  $blogname     = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
-
-  $subject = sprintf('New Report: %s%s%s',
-    $site_title ?: 'Unnamed Site',
-    ($date_label ? ' – ' . $date_label : ''),
-    ($a['po_number'] ? ' – PO ' . $a['po_number'] : '')
-  );
-
-  // Build HTML body
-  ob_start(); ?>
-  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;line-height:1.5">
-    <h2 style="margin:0 0 12px"><?php echo esc_html($subject); ?></h2>
-    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;border-collapse:collapse">
-      <tr>
-        <td style="padding:8px 0"><strong>Property Manager:</strong></td>
-        <td style="padding:8px 0"><?php echo $client_title ? esc_html($client_title) : '—'; ?></td>
-      </tr>
-      <tr>
-        <td style="padding:8px 0"><strong>Site:</strong></td>
-        <td style="padding:8px 0"><?php echo $site_title ? esc_html($site_title) : '—'; ?></td>
-      </tr>
-      <tr>
-        <td style="padding:8px 0"><strong>Date:</strong></td>
-        <td style="padding:8px 0"><?php echo $date_label ? esc_html($date_label) : '—'; ?></td>
-      </tr>
-      <tr>
-        <td style="padding:8px 0"><strong>PO Number:</strong></td>
-        <td style="padding:8px 0"><?php echo $a['po_number'] ? esc_html($a['po_number']) : '—'; ?></td>
-      </tr>
-    </table>
-    <?php if (!empty($a['notes'])): ?>
-      <p><strong>Notes</strong></p>
-      <div style="white-space:pre-wrap;border:1px solid #eee;border-radius:8px;padding:10px;background:#fafbfc">
-        <?php echo wp_kses_post($a['notes']); ?>
-      </div>
-    <?php endif; ?>
-    <?php if (!empty($a['view_url'])): ?>
-      <p style="margin-top:16px">
-        <a href="<?php echo esc_url($a['view_url']); ?>" style="display:inline-block;background:#0f3a47;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px">
-          View Report
-        </a>
-      </p>
-    <?php endif; ?>
-    <p style="color:#6b7280;font-size:12px;margin-top:24px"><?php echo esc_html($blogname); ?></p>
-  </div>
-  <?php
-  $message = ob_get_clean();
-
-  $headers = ['Content-Type: text/html; charset=UTF-8'];
-  $from_email = get_option('admin_email');
-  if ($from_email) {
-    $headers[] = 'From: ' . $blogname . ' <' . $from_email . '>';
-  }
-  if (!empty($a['notify_cc'])) {
-    foreach ((array)$a['notify_cc'] as $cc) {
-      if (is_email($cc)) $headers[] = 'Cc: ' . $cc;
-    }
+/**
+ * Resolve the Property Manager (primary_contact) email.
+ * Site → Client (ACF 'client') → group 'primary_contact' → 'email_address' (or 'email')
+ * Falls back to admin_email if none is valid.
+ */
+function _resolve_property_manager_email(int $site_id, int $client_id = 0): string {
+  if (!function_exists('get_field')) {
+    return get_option('admin_email');
   }
 
-  $sent = wp_mail($a['notify_to'], $subject, $message, $headers);
-
-  if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG && !$sent) {
-    error_log('[Add Report] Email failed to send to ' . $a['notify_to'] . ' for report ' . $a['new_id']);
+  if ($site_id && !$client_id) {
+    $cv  = get_field('client', $site_id);
+    $cid = 0;
+    if (is_numeric($cv)) $cid = (int)$cv;
+    elseif (is_object($cv) && isset($cv->ID)) $cid = (int)$cv->ID;
+    elseif (is_array($cv) && isset($cv['ID'])) $cid = (int)$cv['ID'];
+    elseif (is_array($cv) && isset($cv['value']) && is_numeric($cv['value'])) $cid = (int)$cv['value'];
+    $client_id = $cid ?: $client_id;
   }
+
+  if ($client_id) {
+    $pc = (array) get_field('primary_contact', $client_id);
+    $email = isset($pc['email_address']) ? $pc['email_address'] : ($pc['email'] ?? '');
+    $email = sanitize_email($email);
+    if ($email && is_email($email)) return $email;
+  }
+
+  // Optional: if primary_contact stored on Site itself
+  if ($site_id) {
+    $pc = (array) get_field('primary_contact', $site_id);
+    $email = isset($pc['email_address']) ? $pc['email_address'] : ($pc['email'] ?? '');
+    $email = sanitize_email($email);
+    if ($email && is_email($email)) return $email;
+  }
+
+  return get_option('admin_email');
 }
 
 /* ---- Permissions ---- */
@@ -341,23 +280,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
           }
 
-          // Build destination
+          // Build destination (permalink/preview)
           $dest = _report_destination_after_save($new_id, get_permalink());
 
           // Send email ONLY if final status is publish
-          $final_status = get_post_status($new_id);
-          if ($final_status === 'publish') {
-            _send_new_report_email([
-              'new_id'     => $new_id,
-              'client_id'  => $client_id,
-              'site_id'    => $site_id,
-              'date_store' => $date_to_store,
-              'po_number'  => $po_number,
-              'notes'      => $notes_v,
-              'view_url'   => $dest,
-              'notify_to'  => $notify_to,
-              'notify_cc'  => $notify_cc,
-            ]);
+          if (get_post_status($new_id) === 'publish') {
+            $pm_email = _resolve_property_manager_email((int)$site_id, (int)$client_id);
+
+            // Subject + template args
+            $subject = 'New Report Available';
+            $view_url = get_permalink($new_id);
+            // If you already have a PDF generator endpoint, wire it here:
+            $pdf_url = wp_nonce_url(
+              admin_url('admin-post.php?action=report_pdf&report_id=' . $new_id),
+              'report_pdf_' . $new_id
+            );
+
+            // Use your global sender; fall back safely if not present.
+            if (function_exists('pmc_send_report_email_template')) {
+              pmc_send_report_email_template($pm_email, $subject, [
+                'site_title'  => get_the_title($site_id),
+                'view_url'    => $view_url,
+                'pdf_url'     => $pdf_url,
+                'contact_url' => 'https://pmc-contractinguk.co.uk/contact',
+              ]);
+            } elseif (function_exists('pmc_report_email_template_html')) {
+              $headers = ['Content-Type: text/html; charset=UTF-8'];
+              $blogname  = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
+              $from_email = get_option('admin_email');
+              if ($from_email) $headers[] = 'From: '.$blogname.' <'.$from_email.'>';
+              $html = pmc_report_email_template_html([
+                'site_title'  => get_the_title($site_id),
+                'view_url'    => $view_url,
+                'pdf_url'     => $pdf_url,
+                'contact_url' => 'https://pmc-contractinguk.co.uk/contact',
+              ]);
+              wp_mail($pm_email, $subject, $html, $headers);
+            } else {
+              // Ultra-safe fallback
+              wp_mail($pm_email, $subject, "A new report is available:\n\n$view_url");
+            }
           }
 
           // Redirect (permalink or preview), never back to this page
@@ -368,20 +330,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-/* ========== Options for selects ========== */
-$clients = [];
-$q_clients = new WP_Query([
-  'post_type'      => 'client',
-  'post_status'    => 'publish',
-  'posts_per_page' => -1,
-  'orderby'        => 'title',
-  'order'          => 'ASC',
-  'fields'         => 'ids',
-  'no_found_rows'  => true,
-]);
-foreach ($q_clients->posts as $cid) { $clients[] = [$cid, get_the_title($cid) ?: 'Untitled']; }
-wp_reset_postdata();
-
+/* ========== Options for selects (for combobox rendering) ========== */
 $sites = [];
 $q_sites = new WP_Query([
   'post_type'      => 'site',
@@ -451,254 +400,252 @@ wp_reset_postdata();
   <?php wp_nonce_field('report_form_save','report_form_nonce'); ?>
 
   <?php
-// -----------------------------------------------------------------------------
-// Build Site list (and Site->Client map) used by the combobox
-// -----------------------------------------------------------------------------
-$site_selected_id   = 0;
-$client_selected_id = 0;
+  // Build Site list (and Site->Client map) used by the combobox
+  $site_selected_id   = 0;
+  $client_selected_id = 0;
 
-if (!isset($sites) || !is_array($sites) || !$sites) {
-  $sites = [];
-  $q_sites = new WP_Query([
-    'post_type'      => 'site',
-    'post_status'    => 'publish',
-    'posts_per_page' => -1,
-    'orderby'        => 'title',
-    'order'          => 'ASC',
-    'fields'         => 'ids',
-    'no_found_rows'  => true,
-  ]);
-  foreach ($q_sites->posts as $sid) {
-    $sites[] = [$sid, get_the_title($sid) ?: 'Untitled'];
-  }
-  wp_reset_postdata();
-}
-
-function _client_contact_label($client_id){
-  $contact = '';
-  if ($client_id && function_exists('get_field')) {
-    $g = (array) get_field('primary_contact', $client_id);
-    if (!empty($g['name'])) {
-      $contact = trim((string) $g['name']);
-    } elseif (!empty($g['first_name']) || !empty($g['last_name'])) {
-      $contact = trim(((string)($g['first_name'] ?? '')).' '.((string)($g['last_name'] ?? '')));
-    }
-  }
-  return $contact;
-}
-function _normalize_client_id_from_site($site_id){
-  if (!$site_id || !function_exists('get_field')) return 0;
-  $v = get_field('client', $site_id);
-  if (is_numeric($v)) return (int)$v;
-  if (is_object($v) && isset($v->ID)) return (int)$v->ID;
-  if (is_array($v)) {
-    if (isset($v['ID']))    return (int)$v['ID'];
-    if (isset($v['value'])) return (int)$v['value'];
-  }
-  if (is_string($v) && $v !== '') {
-    $m = get_posts([
-      'post_type'   => 'client',
-      'post_status' => 'publish',
-      'numberposts' => 1,
-      's'           => $v,
-      'fields'      => 'ids',
+  if (!isset($sites) || !is_array($sites) || !$sites) {
+    $sites = [];
+    $q_sites = new WP_Query([
+      'post_type'      => 'site',
+      'post_status'    => 'publish',
+      'posts_per_page' => -1,
+      'orderby'        => 'title',
+      'order'          => 'ASC',
+      'fields'         => 'ids',
+      'no_found_rows'  => true,
     ]);
-    if (!empty($m)) return (int)$m[0];
-  }
-  return 0;
-}
-
-// SiteID -> Client info map for instant client auto-fill
-$site_map = []; // [site_id => ['client_id'=>..,'client_title'=>..,'contact'=>..]]
-foreach ($sites as [$sid, $stitle]) {
-  $cid     = _normalize_client_id_from_site($sid);
-  $ctitle  = $cid ? (get_the_title($cid) ?: '') : '';
-  $contact = $cid ? _client_contact_label($cid) : '';
-  $site_map[(int)$sid] = [
-    'client_id'    => (int)$cid,
-    'client_title' => $ctitle,
-    'contact'      => $contact,
-  ];
-}
-
-$site_current_title = $site_selected_id ? (get_the_title($site_selected_id) ?: 'Untitled') : '';
-$site_display       = $site_current_title ?: '— Select —';
-
-if (!$client_selected_id && $site_selected_id) {
-  $client_selected_id = $site_map[$site_selected_id]['client_id'] ?? 0;
-}
-$client_current_title   = $client_selected_id ? (get_the_title($client_selected_id) ?: '') : '';
-$client_current_contact = $client_selected_id ? _client_contact_label($client_selected_id) : '';
-$client_display = $client_selected_id
-  ? trim(($client_current_contact ? ($client_current_contact.' — ') : '').$client_current_title)
-  : '— Auto-filled from Site —';
-?>
-
-<div class="g2">
-  <!-- SITE: searchable dropdown (site title ONLY) -->
-  <div class="f">
-    <label class="lab" id="report_site_combo-label" for="report_site_combo">Site</label>
-
-    <!-- Real POST field -->
-    <input type="hidden" id="report_site_id" name="report_site_id" value="<?php echo esc_attr($site_selected_id ?: 0); ?>">
-
-    <!-- Trigger -->
-    <button type="button" class="combo-btn" id="report_site_combo"
-            aria-haspopup="listbox" aria-expanded="false"
-            aria-labelledby="report_site_combo-label report_site_combo">
-      <span class="combo-current"><?php echo esc_html($site_display); ?></span>
-      <svg class="caret" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 8l4 4 4-4" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-
-    <!-- Panel -->
-    <div class="combo-panel" id="report_site_panel" hidden>
-      <input id="report_site_search" class="combo-search" type="text" placeholder="Search sites…" autocomplete="off">
-      <ul id="report_site_list" class="combo-list" role="listbox" aria-labelledby="report_site_combo-label">
-        <?php foreach ($sites as [$id,$title]): ?>
-          <?php $title = $title ?: 'Untitled'; ?>
-          <li class="combo-option" role="option" tabindex="-1"
-              data-id="<?php echo esc_attr($id); ?>"
-              data-search1="<?php echo esc_attr($title); ?>">
-            <div class="opt-main"><?php echo esc_html($title); ?></div>
-          </li>
-        <?php endforeach; ?>
-      </ul>
-    </div>
-  </div>
-
-  <!-- CLIENT: read-only, auto-filled from selected site -->
-  <div class="f">
-    <label class="lab" for="report_client_display">Property Manager</label>
-
-    <!-- Real POST field -->
-    <input type="hidden" id="report_client_id" name="report_client_id" value="<?php echo esc_attr($client_selected_id ?: 0); ?>">
-
-    <!-- Read-only chip -->
-    <div class="combo">
-      <div class="combo-btn is-readonly" id="report_client_display" aria-disabled="true">
-        <span class="combo-current"><?php echo esc_html($client_display); ?></span>
-      </div>
-      <small class="hint">Auto-filled from the selected site.</small>
-    </div>
-  </div>
-</div>
-
-<script>
-(function(){
-  // PHP → JS: SiteID -> { client_id, client_title, contact }
-  window.SiteToClientMap = <?php echo wp_json_encode($site_map, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
-
-  function updateClientFromSite(siteId){
-    var info = (window.SiteToClientMap || {})[siteId] || null;
-    var hidClient = document.getElementById('report_client_id');
-    var btn = document.getElementById('report_client_display');
-    var cur = btn ? btn.querySelector('.combo-current') : null;
-
-    var label = '— Auto-filled from Site —';
-    var val   = '0';
-    if (info && info.client_id) {
-      val = String(info.client_id);
-      var parts = [];
-      if (info.contact) parts.push(info.contact);
-      if (info.client_title) parts.push(info.client_title);
-      label = parts.length ? (parts.length === 2 ? (parts[0] + ' — ' + parts[1]) : parts[0]) : label;
+    foreach ($q_sites->posts as $sid) {
+      $sites[] = [$sid, get_the_title($sid) ?: 'Untitled'];
     }
-    if (hidClient) hidClient.value = val;
-    if (cur) cur.textContent = label;
+    wp_reset_postdata();
   }
 
-  (function initSiteCombo(){
-    var btn     = document.getElementById('report_site_combo');
-    var panel   = document.getElementById('report_site_panel');
-    var search  = document.getElementById('report_site_search');
-    var list    = document.getElementById('report_site_list');
-    var hidSite = document.getElementById('report_site_id');
-    var curSite = btn ? btn.querySelector('.combo-current') : null;
-
-    if (!btn || !panel || !search || !list || !hidSite || !curSite) return;
-
-    var options = Array.prototype.slice.call(list.querySelectorAll('.combo-option'));
-    var activeIndex = -1;
-
-    function openPanel(){
-      panel.hidden = false;
-      btn.setAttribute('aria-expanded','true');
-      search.value = '';
-      filter('');
-      setTimeout(function(){ search.focus(); }, 0);
-    }
-    function closePanel(){
-      panel.hidden = true;
-      btn.setAttribute('aria-expanded','false');
-      activeIndex = -1;
-      clearActive();
-    }
-    function togglePanel(){ panel.hidden ? openPanel() : closePanel(); }
-    function clearActive(){ options.forEach(function(o){ o.classList.remove('is-active'); o.removeAttribute('aria-selected'); }); }
-    function visibleOptions(){ return options.filter(function(o){ return o.style.display !== 'none'; }); }
-    function setActiveByIndex(i){
-      var vis = visibleOptions();
-      clearActive();
-      if (!vis.length) { activeIndex = -1; return; }
-      if (i < 0) i = 0;
-      if (i >= vis.length) i = vis.length - 1;
-      vis[i].classList.add('is-active');
-      vis[i].setAttribute('aria-selected','true');
-      vis[i].scrollIntoView({block:'nearest'});
-      activeIndex = i;
-    }
-    function selectOption(opt){
-      if (!opt) return;
-      var id   = opt.getAttribute('data-id') || '0';
-      var main = (opt.querySelector('.opt-main') || {}).textContent || '';
-      hidSite.value       = id;
-      curSite.textContent = main.trim();
-      updateClientFromSite(parseInt(id,10) || 0);
-      closePanel();
-      btn.focus();
-    }
-    function filter(q){
-      var qq = (q || '').trim().toLowerCase();
-      var any = false;
-      list.querySelectorAll('.combo-empty').forEach(function(n){ n.remove(); });
-      options.forEach(function(o){
-        var s1 = (o.getAttribute('data-search1') || '').toLowerCase();
-        var match = s1.indexOf(qq) !== -1;
-        o.style.display = match ? '' : 'none';
-        if (match) any = true;
-      });
-      if (!any) {
-        var li = document.createElement('li');
-        li.className = 'combo-empty';
-        li.textContent = 'No matches';
-        list.appendChild(li);
+  function _client_contact_label($client_id){
+    $contact = '';
+    if ($client_id && function_exists('get_field')) {
+      $g = (array) get_field('primary_contact', $client_id);
+      if (!empty($g['name'])) {
+        $contact = trim((string) $g['name']);
+      } elseif (!empty($g['first_name']) || !empty($g['last_name'])) {
+        $contact = trim(((string)($g['first_name'] ?? '')).' '.((string)($g['last_name'] ?? '')));
       }
-      activeIndex = -1;
-      clearActive();
+    }
+    return $contact;
+  }
+  function _normalize_client_id_from_site($site_id){
+    if (!$site_id || !function_exists('get_field')) return 0;
+    $v = get_field('client', $site_id);
+    if (is_numeric($v)) return (int)$v;
+    if (is_object($v) && isset($v->ID)) return (int)$v->ID;
+    if (is_array($v)) {
+      if (isset($v['ID']))    return (int)$v['ID'];
+      if (isset($v['value'])) return (int)$v['value'];
+    }
+    if (is_string($v) && $v !== '') {
+      $m = get_posts([
+        'post_type'   => 'client',
+        'post_status' => 'publish',
+        'numberposts' => 1,
+        's'           => $v,
+        'fields'      => 'ids',
+      ]);
+      if (!empty($m)) return (int)$m[0];
+    }
+    return 0;
+  }
+
+  // SiteID -> Client info map for instant client auto-fill
+  $site_map = []; // [site_id => ['client_id'=>..,'client_title'=>..,'contact'=>..]]
+  foreach ($sites as [$sid, $stitle]) {
+    $cid     = _normalize_client_id_from_site($sid);
+    $ctitle  = $cid ? (get_the_title($cid) ?: '') : '';
+    $contact = $cid ? _client_contact_label($cid) : '';
+    $site_map[(int)$sid] = [
+      'client_id'    => (int)$cid,
+      'client_title' => $ctitle,
+      'contact'      => $contact,
+    ];
+  }
+
+  $site_current_title = $site_selected_id ? (get_the_title($site_selected_id) ?: 'Untitled') : '';
+  $site_display       = $site_current_title ?: '— Select —';
+
+  if (!$client_selected_id && $site_selected_id) {
+    $client_selected_id = $site_map[$site_selected_id]['client_id'] ?? 0;
+  }
+  $client_current_title   = $client_selected_id ? (get_the_title($client_selected_id) ?: '') : '';
+  $client_current_contact = $client_selected_id ? _client_contact_label($client_selected_id) : '';
+  $client_display = $client_selected_id
+    ? trim(($client_current_contact ? ($client_current_contact.' — ') : '').$client_current_title)
+    : '— Auto-filled from Site —';
+  ?>
+
+  <div class="g2">
+    <!-- SITE: searchable dropdown (site title ONLY) -->
+    <div class="f">
+      <label class="lab" id="report_site_combo-label" for="report_site_combo">Site</label>
+
+      <!-- Real POST field -->
+      <input type="hidden" id="report_site_id" name="report_site_id" value="<?php echo esc_attr($site_selected_id ?: 0); ?>">
+
+      <!-- Trigger -->
+      <button type="button" class="combo-btn" id="report_site_combo"
+              aria-haspopup="listbox" aria-expanded="false"
+              aria-labelledby="report_site_combo-label report_site_combo">
+        <span class="combo-current"><?php echo esc_html($site_display); ?></span>
+        <svg class="caret" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 8l4 4 4-4" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <!-- Panel -->
+      <div class="combo-panel" id="report_site_panel" hidden>
+        <input id="report_site_search" class="combo-search" type="text" placeholder="Search sites…" autocomplete="off">
+        <ul id="report_site_list" class="combo-list" role="listbox" aria-labelledby="report_site_combo-label">
+          <?php foreach ($sites as [$id,$title]): ?>
+            <?php $title = $title ?: 'Untitled'; ?>
+            <li class="combo-option" role="option" tabindex="-1"
+                data-id="<?php echo esc_attr($id); ?>"
+                data-search1="<?php echo esc_attr($title); ?>">
+              <div class="opt-main"><?php echo esc_html($title); ?></div>
+            </li>
+          <?php endforeach; ?>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CLIENT: read-only, auto-filled from selected site -->
+    <div class="f">
+      <label class="lab" for="report_client_display">Property Manager</label>
+
+      <!-- Real POST field -->
+      <input type="hidden" id="report_client_id" name="report_client_id" value="<?php echo esc_attr($client_selected_id ?: 0); ?>">
+
+      <!-- Read-only chip -->
+      <div class="combo">
+        <div class="combo-btn is-readonly" id="report_client_display" aria-disabled="true">
+          <span class="combo-current"><?php echo esc_html($client_display); ?></span>
+        </div>
+        <small class="hint">Auto-filled from the selected site.</small>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    // PHP → JS: SiteID -> { client_id, client_title, contact }
+    window.SiteToClientMap = <?php echo wp_json_encode($site_map, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
+
+    function updateClientFromSite(siteId){
+      var info = (window.SiteToClientMap || {})[siteId] || null;
+      var hidClient = document.getElementById('report_client_id');
+      var btn = document.getElementById('report_client_display');
+      var cur = btn ? btn.querySelector('.combo-current') : null;
+
+      var label = '— Auto-filled from Site —';
+      var val   = '0';
+      if (info && info.client_id) {
+        val = String(info.client_id);
+        var parts = [];
+        if (info.contact) parts.push(info.contact);
+        if (info.client_title) parts.push(info.client_title);
+        label = parts.length ? (parts.length === 2 ? (parts[0] + ' — ' + parts[1]) : parts[0]) : label;
+      }
+      if (hidClient) hidClient.value = val;
+      if (cur) cur.textContent = label;
     }
 
-    btn.addEventListener('click', togglePanel);
-    document.addEventListener('click', function(e){
-      if (!panel.hidden && !panel.contains(e.target) && !btn.contains(e.target)) closePanel();
-    });
-    search.addEventListener('input', function(){ filter(this.value); });
-    search.addEventListener('keydown', function(e){
-      if (e.key === 'ArrowDown'){ e.preventDefault(); setActiveByIndex(activeIndex + 1); }
-      else if (e.key === 'ArrowUp'){ e.preventDefault(); setActiveByIndex(activeIndex - 1); }
-      else if (e.key === 'Enter'){ e.preventDefault(); if (activeIndex >= 0) selectOption(visibleOptions()[activeIndex]); }
-      else if (e.key === 'Escape'){ closePanel(); btn.focus(); }
-    });
-    list.addEventListener('click', function(e){
-      var li = e.target.closest('.combo-option');
-      if (li) selectOption(li);
-    });
+    (function initSiteCombo(){
+      var btn     = document.getElementById('report_site_combo');
+      var panel   = document.getElementById('report_site_panel');
+      var search  = document.getElementById('report_site_search');
+      var list    = document.getElementById('report_site_list');
+      var hidSite = document.getElementById('report_site_id');
+      var curSite = btn ? btn.querySelector('.combo-current') : null;
 
-    // On load, sync client from any preselected site (should be 0 on add)
-    var initSite = parseInt(hidSite.value || '0', 10) || 0;
-    if (initSite) updateClientFromSite(initSite);
+      if (!btn || !panel || !search || !list || !hidSite || !curSite) return;
+
+      var options = Array.prototype.slice.call(list.querySelectorAll('.combo-option'));
+      var activeIndex = -1;
+
+      function openPanel(){
+        panel.hidden = false;
+        btn.setAttribute('aria-expanded','true');
+        search.value = '';
+        filter('');
+        setTimeout(function(){ search.focus(); }, 0);
+      }
+      function closePanel(){
+        panel.hidden = true;
+        btn.setAttribute('aria-expanded','false');
+        activeIndex = -1;
+        clearActive();
+      }
+      function togglePanel(){ panel.hidden ? openPanel() : closePanel(); }
+      function clearActive(){ options.forEach(function(o){ o.classList.remove('is-active'); o.removeAttribute('aria-selected'); }); }
+      function visibleOptions(){ return options.filter(function(o){ return o.style.display !== 'none'; }); }
+      function setActiveByIndex(i){
+        var vis = visibleOptions();
+        clearActive();
+        if (!vis.length) { activeIndex = -1; return; }
+        if (i < 0) i = 0;
+        if (i >= vis.length) i = vis.length - 1;
+        vis[i].classList.add('is-active');
+        vis[i].setAttribute('aria-selected','true');
+        vis[i].scrollIntoView({block:'nearest'});
+        activeIndex = i;
+      }
+      function selectOption(opt){
+        if (!opt) return;
+        var id   = opt.getAttribute('data-id') || '0';
+        var main = (opt.querySelector('.opt-main') || {}).textContent || '';
+        hidSite.value       = id;
+        curSite.textContent = main.trim();
+        updateClientFromSite(parseInt(id,10) || 0);
+        closePanel();
+        btn.focus();
+      }
+      function filter(q){
+        var qq = (q || '').trim().toLowerCase();
+        var any = false;
+        list.querySelectorAll('.combo-empty').forEach(function(n){ n.remove(); });
+        options.forEach(function(o){
+          var s1 = (o.getAttribute('data-search1') || '').toLowerCase();
+          var match = s1.indexOf(qq) !== -1;
+          o.style.display = match ? '' : 'none';
+          if (match) any = true;
+        });
+        if (!any) {
+          var li = document.createElement('li');
+          li.className = 'combo-empty';
+          li.textContent = 'No matches';
+          list.appendChild(li);
+        }
+        activeIndex = -1;
+        clearActive();
+      }
+
+      btn.addEventListener('click', togglePanel);
+      document.addEventListener('click', function(e){
+        if (!panel.hidden && !panel.contains(e.target) && !btn.contains(e.target)) closePanel();
+      });
+      search.addEventListener('input', function(){ filter(this.value); });
+      search.addEventListener('keydown', function(e){
+        if (e.key === 'ArrowDown'){ e.preventDefault(); setActiveByIndex(activeIndex + 1); }
+        else if (e.key === 'ArrowUp'){ e.preventDefault(); setActiveByIndex(activeIndex - 1); }
+        else if (e.key === 'Enter'){ e.preventDefault(); if (activeIndex >= 0) selectOption(visibleOptions()[activeIndex]); }
+        else if (e.key === 'Escape'){ closePanel(); btn.focus(); }
+      });
+      list.addEventListener('click', function(e){
+        var li = e.target.closest('.combo-option');
+        if (li) selectOption(li);
+      });
+
+      // On load, sync client from any preselected site (should be 0 on add)
+      var initSite = parseInt(hidSite.value || '0', 10) || 0;
+      if (initSite) updateClientFromSite(initSite);
+    })();
   })();
-})();
-</script>
+  </script>
 
   <div class="g2">
     <div class="f">
@@ -742,7 +689,6 @@ $client_display = $client_selected_id
             }
             $file_url = $att_id ? wp_get_attachment_url($att_id) : '';
             $file_name = $att_id ? get_the_title($att_id) : 'Video';
-            $row_index = $i + 1;
           ?>
             <li class="vr-item">
               <div>

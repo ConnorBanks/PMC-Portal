@@ -87,6 +87,22 @@
 			// Sliders
 			/////////////////////////////////////////////////////////////////////////////////
 			
+			$('#generate-pdf').on('click', function() {
+				var pageId = $(this).data('page-id');
+
+				// Send AJAX request
+				$.post(pdfGen.ajax_url, {
+					action: 'generate_pdf',
+					page_id: pageId,
+					_ajax_nonce: pdfGen.nonce
+				}, function(response) {
+					if (response.success) {
+						window.open(response.data.url, '_blank');
+					} else {
+						alert('Failed to generate PDF');
+					}
+				});
+			});
 				
 					
 			

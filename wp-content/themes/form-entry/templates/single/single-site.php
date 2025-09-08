@@ -115,17 +115,22 @@ $edit_url  = $site_id ? add_query_arg(['siteID' => $site_id], $edit_base) : $edi
       </div>
 
       <div class="vc-field">
-        <span class="vc-label">Client</span>
+        <span class="vc-label">Property Manager</span>
         <div class="vc-value"><?php echo wp_kses_post(site_render_client_html($site_id)); ?> <i class="fas fa-external-link"></i></div>
       </div>
 
       <div class="vc-field" style="grid-column:1 / -1">
-        <span class="vc-label">Site Notes</span>
+        <span class="vc-label">Description of Works</span>
         <div class="vc-value"><?php echo $site_notes ? esc_html($site_notes) : '—'; ?></div>
       </div>
-      <div class="vc-actions">
-        <a class="btn" href="<?php echo esc_url($edit_url); ?>">Edit Site</a>
-      </div>
+      <?php 
+      if(is_user_logged_in()){ ?>
+        <div class="vc-actions">
+          <a class="btn" href="<?php echo esc_url($edit_url); ?>">Edit Site</a>
+        </div>
+      <?php
+      } ?>
+      
     </div>
   </div>
 <?php endif; ?>

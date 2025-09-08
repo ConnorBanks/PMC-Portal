@@ -12,6 +12,14 @@
  }
 }
 
+require_once get_template_directory() . '/vendor/dompdf/autoload.inc.php';
+
+require_once get_theme_file_path('functions/pdf-report.php');
+
+require_once get_theme_file_path('functions/email-report.php');
+
+
+
 /**
  * Forward wp-login.php to home for everyone unless a secret key is present.
  * Also keeps wp-admin locked to Connor only (by email).

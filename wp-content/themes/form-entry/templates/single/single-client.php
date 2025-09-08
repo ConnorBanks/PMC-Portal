@@ -60,11 +60,11 @@ $edit_url  = $client_id ? add_query_arg(['clientID' => $client_id], $edit_base) 
       <?php if ($deleted): ?><div class="note">Client was deleted.</div><?php endif; ?>
 
       <div class="vc-card">
-        <p class="vc-sub">Site Manager</p>
+        <p class="vc-sub">Property Manager</p>
 
         <div class="vc-grid">
           <div class="vc-field">
-            <span class="vc-label">Name</span>
+            <span class="vc-label">Full Name</span>
             <div class="vc-value"><?php echo $contact_name ? esc_html($contact_name) : '—'; ?></div>
           </div>
           <div class="vc-field">

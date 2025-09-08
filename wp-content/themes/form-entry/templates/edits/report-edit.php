@@ -1,30 +1,6 @@
-
-
-<?php
-$report_id = $_GET['reportID'];;
-$status    = get_post_status($report_id);
-?>
-
-<style>
-  .banner-draft{
-    margin:16px 0;
-    padding:12px 14px;
-    border:1px solid #fde68a;
-    background:#fffbeb;
-    color:#7c2d12;
-    border-radius:10px;
-    font-size:15px;
-  }
-</style>
-
-<?php if ($status === 'draft'): ?>
-  <div class="banner-draft">
-    This report is currently <strong>in draft</strong> and <strong>has not been sent</strong> to the property manager. To send, please save and use the 'resend email' function.
-  </div>
-<?php endif; ?>
 <?php
 /**
- * Template Name: Edit Report (ACF) – Save + Resend
+ * Template Name: Edit Report (ACF) – Save + Resend (PM Recipient)
  */
 defined('ABSPATH') || exit;
 
@@ -40,9 +16,10 @@ $acf_full_notes   = 'full_notes';
 $acf_key_client   = ''; // e.g. 'field_xxxxxx_client'
 $acf_key_site     = ''; // e.g. 'field_yyyyyy_site'
 
-$acf_videos         = 'videos';        // repeater field name
-$acf_video_file     = 'video_file';    // file subfield name
-$acf_video_caption  = 'video_caption'; // optional; '' if you don’t have one
+/* ACF Repeater (videos) */
+$acf_videos         = 'videos';
+$acf_video_file     = 'video_file';
+$acf_video_caption  = 'video_caption';
 
 /* ---------- Helpers ---------- */
 function _report_view_pretty_url($post): string {
@@ -125,13 +102,6 @@ function _save_post_link_field(int $post_id, string $field_name, int $incoming_i
   $update_id = $key ?: $field_name;
   $ok = update_field($update_id, $value_to_save, $post_id);
 
-  if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
-    error_log(sprintf(
-      '[Edit Report] update_field %s => %s (type:%s multiple:%s fmt:%s) value:%s result:%s',
-      $field_name, $update_id, $type, $multiple ? 'true' : 'false', $return_fmt, wp_json_encode($value_to_save), $ok ? 'OK' : 'FAIL'
-    ));
-  }
-
   if (!$ok && $key) {
     update_post_meta($post_id, '_' . $field_name, $key);
     update_post_meta($post_id, $field_name, $value_to_save);
@@ -155,133 +125,41 @@ function _input_date_for_acf(string $input, $field_obj): string {
 }
 
 /**
- * Branded email (sends to CLIENT primary_contact.email_address by default).
- * Pass a blank 'notify_to' to use client email; otherwise it uses the given address.
+ * Resolve the Property Manager (primary_contact) email.
+ * Site → Client (ACF 'client') → group 'primary_contact' → 'email_address' (or 'email')
+ * Falls back to admin_email if none is valid.
  */
-function _send_report_email(array $args): void {
-  $defaults = [
-    'new_id'         => 0,
-    'client_id'      => 0,
-    'site_id'        => 0,
-    'date_store'     => '',
-    'po_number'      => '',
-    'notes'          => '',
-    'view_url'       => '',
-    'pdf_url'        => '',
-
-    'notify_to'      => '', // leave blank to use client email
-    'notify_cc'      => [],
-    'subject_prefix' => 'New Report Available',
-
-    // Brand + links
-    'logo_url'       => 'https://pmc-portal.blacksheep-creative.co.uk/wp-content/uploads/2025/07/WhatsApp-Image-2025-05-01-at-12.11.53.jpeg',
-    'contact_url'    => 'https://pmc-contractinguk.co.uk/contact',
-    'portal_url'     => 'https://pmc-contractinguk.co.uk/portal',
-
-    'company_name'   => 'PMC Contracting (UK)',
-    'company_url'    => 'https://pmc-contractinguk.co.uk',
-    'company_address'=> '53 West Street, Sittingbourne, Kent ME10 1AN',
-    'copyright_line' => '© ' . gmdate('Y') . ' PMC Contracting (UK)',
-
-    'social_twitter'   => 'https://twitter.com/yourhandle',
-    'social_facebook'  => 'https://facebook.com/yourpage',
-    'social_instagram' => 'https://instagram.com/yourhandle',
-  ];
-  $a = array_merge($defaults, $args);
-
-  // Resolve recipient to client's primary contact email if not explicitly provided
-  $client_email = '';
-  if (empty($a['notify_to']) && !empty($a['client_id']) && function_exists('get_field')) {
-    $group = (array) get_field('primary_contact', (int) $a['client_id']);
-    if (!empty($group['email_address'])) {
-      $client_email = sanitize_email($group['email_address']);
-    }
-  }
-  $to = $a['notify_to'] ?: $client_email ?: get_option('admin_email');
-  if (!is_email($to)) {
-    if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
-      error_log('[Report Email] Aborted: no valid recipient. client_id='.$a['client_id'].' report_id='.$a['new_id']);
-    }
-    return;
+function _resolve_property_manager_email(int $site_id, int $client_id = 0): string {
+  if (!function_exists('get_field')) {
+    return get_option('admin_email');
   }
 
-  // Titles / dates
-  $site_title   = $a['site_id']   ? get_the_title($a['site_id'])   : '';
-  $date_label   = (function($raw){
-    if (!$raw) return '';
-    if (preg_match('/^\d{8}$/', $raw)) $raw = substr($raw,0,4).'-'.substr($raw,4,2).'-'.substr($raw,6,2);
-    $ts = strtotime($raw);
-    return $ts ? date_i18n('j M Y', $ts) : $raw;
-  })($a['date_store']);
-
-  $subject = trim(sprintf(
-    '%s: %s%s%s',
-    $a['subject_prefix'],
-    $site_title ?: 'Project',
-    ($date_label ? ' – '.$date_label : ''),
-    ($a['po_number'] ? ' – PO '.$a['po_number'] : '')
-  ));
-
-  // Colors
-  $brand_teal   = '#0f3a47';
-  $text_main    = '#111827';
-  $text_muted   = '#6b7280';
-  $border       = '#d7dfe7';
-  $bg_page      = '#f9f9fb';
-
-  ob_start(); ?>
-  <!doctype html><html><body style="margin:0;padding:0;background:<?php echo $bg_page; ?>;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:<?php echo $bg_page; ?>;">
-    <tr><td align="center" style="padding:0">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:<?php echo $brand_teal; ?>;">
-        <tr><td align="center" style="padding:18px 16px">
-          <img src="<?php echo esc_url($a['logo_url']); ?>" alt="PMC" style="display:block;height:32px;width:auto;border:0;">
-        </td></tr>
-      </table>
-
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;margin:25px auto 0;border-collapse:separate;border:1px solid <?php echo $border; ?>;border-radius:14px;overflow:hidden;">
-        <tr><td style="padding:28px 22px 10px 22px;text-align:center">
-          <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.2;color:<?php echo $text_main; ?>;margin:0 0 8px">New Report<br>Available</div>
-          <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;color:<?php echo $text_muted; ?>;font-size:16px;line-height:1.6;margin:8px 0 18px">
-            We’ve generated a new report for your project<?php echo $site_title ? ' at <strong style="color:'.$text_main.'">'.$site_title.'</strong>' : ''; ?>.
-          </div>
-        </td></tr>
-
-        <?php if (!empty($a['view_url'])): ?>
-        <tr><td align="center" style="padding:2px 22px 22px 22px">
-          <a href="<?php echo esc_url($a['view_url']); ?>" style="display:inline-block;background:<?php echo $brand_teal; ?>;color:#fff;text-decoration:none;font-weight:700;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;font-size:16px;line-height:1;padding:16px 28px;border-radius:28px;">View Report</a>
-        </td></tr>
-        <?php endif; ?>
-      </table>
-
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:<?php echo $brand_teal; ?>;margin-top:18px">
-        <tr><td align="center" style="padding:6px 16px 2px 16px">
-          <a href="<?php echo esc_url($a['company_url']); ?>" style="color:#ffffff;text-decoration:none;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif">pmc-contractinguk.co.uk</a>
-        </td></tr>
-        <tr><td align="center" style="padding:4px 16px 22px 16px;color:#d1e1e7;font-size:12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif">
-          <?php echo esc_html($a['copyright_line']); ?>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-  </body></html>
-  <?php
-  $message = ob_get_clean();
-
-  $headers = ['Content-Type: text/html; charset=UTF-8'];
-  $blogname  = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
-  $from_email = get_option('admin_email');
-  if ($from_email) $headers[] = 'From: '.$blogname.' <'.$from_email.'>';
-  if (!empty($a['notify_cc'])) {
-    foreach ((array)$a['notify_cc'] as $cc) {
-      if (is_email($cc)) $headers[] = 'Cc: '.$cc;
-    }
+  if ($site_id && !$client_id) {
+    $cv  = get_field('client', $site_id);
+    $cid = 0;
+    if (is_numeric($cv)) $cid = (int)$cv;
+    elseif (is_object($cv) && isset($cv->ID)) $cid = (int)$cv->ID;
+    elseif (is_array($cv) && isset($cv['ID'])) $cid = (int)$cv['ID'];
+    elseif (is_array($cv) && isset($cv['value']) && is_numeric($cv['value'])) $cid = (int)$cv['value'];
+    $client_id = $cid ?: $client_id;
   }
 
-  $sent = wp_mail($to, $subject, $message, $headers);
-  if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG && !$sent) {
-    error_log('[Report Email] Failed to send to '.$to.' (report '.$a['new_id'].')');
+  if ($client_id) {
+    $pc = (array) get_field('primary_contact', $client_id);
+    $email = isset($pc['email_address']) ? $pc['email_address'] : ($pc['email'] ?? '');
+    $email = sanitize_email($email);
+    if ($email && is_email($email)) return $email;
   }
+
+  // Optional: if primary_contact stored on Site itself
+  if ($site_id) {
+    $pc = (array) get_field('primary_contact', $site_id);
+    $email = isset($pc['email_address']) ? $pc['email_address'] : ($pc['email'] ?? '');
+    $email = sanitize_email($email);
+    if ($email && is_email($email)) return $email;
+  }
+
+  return get_option('admin_email');
 }
 
 /* ---------- Input + permissions ---------- */
@@ -295,6 +173,27 @@ $emailed = isset($_GET['emailed']) ? (int) $_GET['emailed'] : 0;
 /* Where to go after save */
 $view_url = $post_obj ? _report_view_pretty_url($post_obj) : trailingslashit(home_url('/report/')); // /report/{slug}/
 
+/* Draft banner */
+$status = $post_obj ? get_post_status($report_id) : '';
+?>
+<style>
+  .banner-draft{
+    margin:16px 0;
+    padding:12px 14px;
+    border:1px solid #fde68a;
+    background:#fffbeb;
+    color:#7c2d12;
+    border-radius:10px;
+    font-size:15px;
+  }
+</style>
+<?php if ($status === 'draft'): ?>
+  <div class="banner-draft">
+    This report is currently <strong>in draft</strong> and <strong>has not been sent</strong> to the property manager. To send, please save and use the “Resend Email” button.
+  </div>
+<?php endif; ?>
+
+<?php
 /**
  * Get repeater + subfield KEYS from names so we can add rows reliably.
  * Returns ['parent'=>'field_xxx', 'file'=>'field_yyy', 'caption'=>'field_zzz' (or '')]
@@ -330,28 +229,50 @@ if ($post_obj && $_SERVER['REQUEST_METHOD'] === 'POST') {
     _report_safe_redirect(add_query_arg(['error'=>'mismatch'], remove_query_arg('error')));
   }
 
-  // RESEND EMAIL (no data changes; sends to client's email)
+  // RESEND EMAIL (uses PM email + your global template sender)
   if (isset($_POST['resend_report_email'])) {
     $client_raw = function_exists('get_field') ? get_field($acf_client, $report_id) : '';
     $site_raw   = function_exists('get_field') ? get_field($acf_site,   $report_id) : '';
-    $date_raw   = function_exists('get_field') ? get_field($acf_date,   $report_id) : '';
-    $po_v       = function_exists('get_field') ? (string) get_field($acf_po_number,  $report_id) : '';
-    $notes_v    = function_exists('get_field') ? (string) get_field($acf_full_notes, $report_id) : '';
 
     $client_id = _acf_post_link_current_id($client_raw, 'client');
     $site_id   = _acf_post_link_current_id($site_raw,   'site');
 
-    _send_report_email([
-      'new_id'        => $report_id,
-      'client_id'     => $client_id,
-      'site_id'       => $site_id,
-      'date_store'    => is_string($date_raw) ? $date_raw : '',
-      'po_number'     => $po_v,
-      'notes'         => $notes_v,
-      'view_url'      => _report_view_pretty_url($post_obj),
-      // no notify_to → resolves to client primary_contact email
-      'subject_prefix'=> 'Report (Resent)',
-    ]);
+    // Build links
+    $view_link = _report_view_pretty_url($post_obj);
+    $pdf_url   = wp_nonce_url(
+      admin_url('admin-post.php?action=report_pdf&report_id=' . $report_id),
+      'report_pdf_' . $report_id
+    );
+
+    // Resolve recipient
+    $pm_email = _resolve_property_manager_email((int)$site_id, (int)$client_id);
+
+    // Send using your global template helper
+    $subject = 'Report (Resent)';
+    if (function_exists('pmc_send_report_email_template')) {
+      pmc_send_report_email_template($pm_email, $subject, [
+        'site_title'  => $site_id ? get_the_title($site_id) : '',
+        'view_url'    => $view_link,
+        'pdf_url'     => $pdf_url,
+        'contact_url' => 'https://pmc-contractinguk.co.uk/contact',
+      ]);
+    } elseif (function_exists('pmc_report_email_template_html')) {
+      // Secondary fallback if you only have the HTML builder
+      $headers = ['Content-Type: text/html; charset=UTF-8'];
+      $blogname  = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
+      $from_email = get_option('admin_email');
+      if ($from_email) $headers[] = 'From: '.$blogname.' <'.$from_email.'>';
+      $html = pmc_report_email_template_html([
+        'site_title'  => $site_id ? get_the_title($site_id) : '',
+        'view_url'    => $view_link,
+        'pdf_url'     => $pdf_url,
+        'contact_url' => 'https://pmc-contractinguk.co.uk/contact',
+      ]);
+      wp_mail($pm_email, $subject, $html, $headers);
+    } else {
+      // Ultra-simple fallback
+      wp_mail($pm_email, $subject, "A report is available:\n\n$view_link");
+    }
 
     _report_safe_redirect(add_query_arg(['emailed'=>1], remove_query_arg('error')));
   }
@@ -419,52 +340,50 @@ if ($post_obj && $_SERVER['REQUEST_METHOD'] === 'POST') {
       $merged = array_values(array_unique(array_merge($current_ids, $new_ids)));
       update_field($acf_gallery, $merged, $report_id);
     }
-
-    // --- VIDEOS (Repeater) : delete selected rows ---
-$keys = _video_field_keys($report_id, $acf_videos, $acf_video_file, $acf_video_caption);
-$parent_id   = $keys['parent'] ?: $acf_videos;
-$file_key    = $keys['file']   ?: $acf_video_file;
-$caption_key = $acf_video_caption && $keys['caption'] ? $keys['caption'] : '';
-
-if (!empty($_POST['remove_video_rows']) && is_array($_POST['remove_video_rows'])) {
-  $rows = array_map('absint', $_POST['remove_video_rows']);
-  rsort($rows); // delete from highest index first
-  foreach ($rows as $idx) {
-    // ACF repeater rows are 1-based for delete_row
-    delete_row($parent_id, $idx, $report_id);
   }
-}
 
-// --- VIDEOS (Repeater) : add one row per newly uploaded video ---
-if (!empty($_FILES['report_videos']) && is_array($_FILES['report_videos']['name'])) {
-  require_once ABSPATH . 'wp-admin/includes/file.php';
-  require_once ABSPATH . 'wp-admin/includes/media.php';
-  require_once ABSPATH . 'wp-admin/includes/image.php';
+  // --- VIDEOS (Repeater) : delete selected rows ---
+  $keys = _video_field_keys($report_id, $acf_videos, $acf_video_file, $acf_video_caption);
+  $parent_id   = $keys['parent'] ?: $acf_videos;
+  $file_key    = $keys['file']   ?: $acf_video_file;
+  $caption_key = $acf_video_caption && $keys['caption'] ? $keys['caption'] : '';
 
-  $F   = $_FILES['report_videos'];
-  $CAP = isset($_POST['report_video_captions']) && is_array($_POST['report_video_captions']) ? $_POST['report_video_captions'] : [];
-
-  foreach ($F['name'] as $i => $name) {
-    if (empty($name) || ($F['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
-    $file_array = [
-      'name'     => $name,
-      'type'     => $F['type'][$i],
-      'tmp_name' => $F['tmp_name'][$i],
-      'error'    => $F['error'][$i],
-      'size'     => $F['size'][$i],
-    ];
-    $att_id = media_handle_sideload($file_array, $report_id);
-    if (!is_wp_error($att_id)) {
-      $row = [ $file_key => (int)$att_id ];
-      if ($caption_key) {
-        $cap = isset($CAP[$i]) ? sanitize_text_field($CAP[$i]) : '';
-        if ($cap !== '') $row[$caption_key] = $cap;
-      }
-      add_row($parent_id, $row, $report_id);
+  if (!empty($_POST['remove_video_rows']) && is_array($_POST['remove_video_rows'])) {
+    $rows = array_map('absint', $_POST['remove_video_rows']);
+    rsort($rows); // delete from highest index first
+    foreach ($rows as $idx) {
+      delete_row($parent_id, $idx, $report_id); // ACF repeater rows are 1-based
     }
   }
-}
 
+  // --- VIDEOS (Repeater) : add one row per newly uploaded video ---
+  if (!empty($_FILES['report_videos']) && is_array($_FILES['report_videos']['name'])) {
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    require_once ABSPATH . 'wp-admin/includes/media.php';
+    require_once ABSPATH . 'wp-admin/includes/image.php';
+
+    $F   = $_FILES['report_videos'];
+    $CAP = isset($_POST['report_video_captions']) && is_array($_POST['report_video_captions']) ? $_POST['report_video_captions'] : [];
+
+    foreach ($F['name'] as $i => $name) {
+      if (empty($name) || ($F['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+      $file_array = [
+        'name'     => $name,
+        'type'     => $F['type'][$i],
+        'tmp_name' => $F['tmp_name'][$i],
+        'error'    => $F['error'][$i],
+        'size'     => $F['size'][$i],
+      ];
+      $att_id = media_handle_sideload($file_array, $report_id);
+      if (!is_wp_error($att_id)) {
+        $row = [ $file_key => (int)$att_id ];
+        if ($caption_key) {
+          $cap = isset($CAP[$i]) ? sanitize_text_field($CAP[$i]) : '';
+          if ($cap !== '') $row[$caption_key] = $cap;
+        }
+        add_row($parent_id, $row, $report_id);
+      }
+    }
   }
 
   clean_post_cache($report_id);
@@ -597,7 +516,7 @@ $client_display = $client_selected_id
   .combo-option:hover,.combo-option.is-active{background:#f5f7fb}
   .combo-empty{padding:12px;color:#6b7280;font-size:14px}
   .opt-main{font-weight:600;color:#111827}
-  .is-readonly{background:#f9fafb;cursor:default}
+  .is-readonly{background:#f9faff;cursor:default}
   .hint{display:block;margin-top:6px;color:#6b7280;font-size:13px}
 
   .vr{border:1px solid #d7dfe7;border-radius:12px;padding:12px}
@@ -709,63 +628,61 @@ $client_display = $client_selected_id
     </div>
 
     <div class="f">
-  <label class="lab">Videos</label>
+      <label class="lab">Videos</label>
 
-  <!-- Existing videos list (EDIT page only) -->
-  <?php if (isset($report_id) && $report_id && function_exists('get_field')): ?>
-    <?php $existing_videos = (array) get_field($acf_videos, $report_id); ?>
-    <?php if (!empty($existing_videos)): ?>
-      <ul class="vr-list" aria-label="Existing videos">
-        <?php foreach ($existing_videos as $i => $row): 
-          // Normalise attachment ID from return format
-          $att_id = 0; $cap_txt = '';
-          if (!empty($row[$acf_video_file])) {
-            $v = $row[$acf_video_file];
-            if (is_numeric($v)) $att_id = (int) $v;
-            elseif (is_array($v) && isset($v['ID'])) $att_id = (int) $v['ID'];
-            elseif (is_object($v) && isset($v->ID)) $att_id = (int) $v->ID;
-          }
-          if ($acf_video_caption && !empty($row[$acf_video_caption])) {
-            $cap = $row[$acf_video_caption];
-            $cap_txt = is_array($cap) ? (string)($cap['text'] ?? '') : (string)$cap;
-          }
-          $file_url = $att_id ? wp_get_attachment_url($att_id) : '';
-          $file_name = $att_id ? get_the_title($att_id) : 'Video';
-          $row_index = $i + 1; // ACF repeater rows are 1-based when deleting
-        ?>
-          <li class="vr-item">
-            <div>
-              <div class="title"><?php echo esc_html($file_name); ?></div>
-              <?php if ($file_url): ?>
-                <small><a href="<?php echo esc_url($file_url); ?>" target="_blank" rel="noopener">Open</a></small>
-              <?php endif; ?>
-              <?php if ($cap_txt): ?>
-                <div><small><?php echo esc_html($cap_txt); ?></small></div>
-              <?php endif; ?>
-            </div>
-            <label style="white-space:nowrap;">
-              <input type="checkbox" name="remove_video_rows[]" value="<?php echo esc_attr($row_index); ?>">
-              Remove
-            </label>
-          </li>
-        <?php endforeach; ?>
-      </ul>
-    <?php endif; ?>
-  <?php endif; ?>
+      <!-- Existing videos list (EDIT page only) -->
+      <?php if (isset($report_id) && $report_id && function_exists('get_field')): ?>
+        <?php $existing_videos = (array) get_field($acf_videos, $report_id); ?>
+        <?php if (!empty($existing_videos)): ?>
+          <ul class="vr-list" aria-label="Existing videos">
+            <?php foreach ($existing_videos as $i => $row):
+              $att_id = 0; $cap_txt = '';
+              if (!empty($row[$acf_video_file])) {
+                $v = $row[$acf_video_file];
+                if (is_numeric($v)) $att_id = (int) $v;
+                elseif (is_array($v) && isset($v['ID'])) $att_id = (int) $v['ID'];
+                elseif (is_object($v) && isset($v->ID)) $att_id = (int) $v->ID;
+              }
+              if ($acf_video_caption && !empty($row[$acf_video_caption])) {
+                $cap = $row[$acf_video_caption];
+                $cap_txt = is_array($cap) ? (string)($cap['text'] ?? '') : (string)$cap;
+              }
+              $file_url = $att_id ? wp_get_attachment_url($att_id) : '';
+              $file_name = $att_id ? get_the_title($att_id) : 'Video';
+              $row_index = $i + 1; // ACF repeater rows are 1-based when deleting
+            ?>
+              <li class="vr-item">
+                <div>
+                  <div class="title"><?php echo esc_html($file_name); ?></div>
+                  <?php if ($file_url): ?>
+                    <small><a href="<?php echo esc_url($file_url); ?>" target="_blank" rel="noopener">Open</a></small>
+                  <?php endif; ?>
+                  <?php if ($cap_txt): ?>
+                    <div><small><?php echo esc_html($cap_txt); ?></small></div>
+                  <?php endif; ?>
+                </div>
+                <label style="white-space:nowrap;">
+                  <input type="checkbox" name="remove_video_rows[]" value="<?php echo esc_attr($row_index); ?>">
+                  Remove
+                </label>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
+      <?php endif; ?>
 
-  <!-- Add new videos -->
-  <div id="video-repeater" class="vr" aria-label="Add videos">
-    <div class="vr-row">
-      <input type="file" name="report_videos[]" accept="video/*" />
-      <input type="text" name="report_video_captions[]" class="cap" placeholder="Optional caption" />
-      <button type="button" class="vr-btn vr-remove" onclick="this.closest('.vr-row').remove()">Remove</button>
+      <!-- Add new videos -->
+      <div id="video-repeater" class="vr" aria-label="Add videos">
+        <div class="vr-row">
+          <input type="file" name="report_videos[]" accept="video/*" />
+          <input type="text" name="report_video_captions[]" class="cap" placeholder="Optional caption" />
+          <button type="button" class="vr-btn vr-remove" onclick="this.closest('.vr-row').remove()">Remove</button>
+        </div>
+      </div>
+      <div class="vr-add">
+        <button type="button" class="vr-btn" id="add-video-row">+ Add another video</button>
+      </div>
     </div>
-  </div>
-  <div class="vr-add">
-    <button type="button" class="vr-btn" id="add-video-row">+ Add another video</button>
-  </div>
-</div>
-
 
     <div class="f">
       <label class="lab" for="full_notes">Description of Works</label>
@@ -926,7 +843,6 @@ function confirmDeleteReport(e){
   var form  = document.querySelector('form');
   var dirty = false;
 
-  // Mark form as "dirty" on any change or input
   if (form){
     form.addEventListener('input',  function(){ dirty = true; }, true);
     form.addEventListener('change', function(){ dirty = true; }, true);
@@ -941,7 +857,6 @@ function confirmDeleteReport(e){
       proceed = confirm('Discard changes and leave this page? Unsaved changes will be lost.');
     }
     if (proceed){
-      // Destination: single report view if available, else the listing page
       var dest = <?php
         $dest = isset($view_url) && $view_url ? $view_url : trailingslashit(home_url('/reports/'));
         echo json_encode($dest);
