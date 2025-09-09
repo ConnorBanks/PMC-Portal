@@ -1090,6 +1090,13 @@ p.btn-red:hover a, p.btn-red:hover span, p.btn-red:hover i {
 .site-header.logged-out {
   padding: 0;
 }
+@media (max-width: 768px) {
+  .site-header.logged-out {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
 .site-header.logged-out .logo-container {
   display: flex;
   justify-content: center;
@@ -1100,6 +1107,13 @@ p.btn-red:hover a, p.btn-red:hover span, p.btn-red:hover i {
 .site-header.logged-out .logo-container img {
   height: 45px;
 }
+@media (max-width: 768px) {
+  .site-header.logged-out .logo-container img {
+    height: auto;
+    width: 100%;
+    transform: rotate(-90deg);
+  }
+}
 .site-header.logged-out .company-information {
   flex-grow: 2;
   background-size: cover;
@@ -1108,6 +1122,11 @@ p.btn-red:hover a, p.btn-red:hover span, p.btn-red:hover i {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+}
+@media (max-width: 768px) {
+  .site-header.logged-out .company-information {
+    display: none;
+  }
 }
 .site-header.logged-out .company-information:after {
   content: "";

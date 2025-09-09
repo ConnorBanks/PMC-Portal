@@ -28,7 +28,7 @@
 			  });
 
 			  function resize() {
-				if ($(window).width() < 700) {
+				if ($(window).width() < 768) {
 					$(".wrapper").addClass('menu-collapsed');
 					$(".site-header").addClass('collapsed');
 				} else {
